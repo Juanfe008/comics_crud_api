@@ -1,0 +1,12 @@
+# Ignorar entornos virtuales
+.venv
+.env
+
+# Archivos de caché
+__pycache__/
+*.pyc
+*.pyo
+
+# Configuración de IDE
+.vscode/
+.idea/
