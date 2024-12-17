@@ -31,7 +31,7 @@ app = FastAPI()
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,27 +73,48 @@ async def create_comic(comic: dict):
         price=comic["price"],
         stock=comic["stock"],
     )
-    comic_id = await database.execute(query)
-    return {**comic, "id": comic_id}
+    comic_id = await database.execute(query)  # Devuelve el ID generado (en la mayoría de las bases de datos)
+    if not comic_id:
+        raise HTTPException(status_code=500, detail="Failed to create comic")
+    
+    # Recuperar el cómic recién creado
+    select_query = comics.select().where(comics.c.id == comic_id)
+    created_comic = await database.fetch_one(select_query)
+    return created_comic
 
 @app.put("/comics/{comic_id}")
 async def update_comic(comic_id: int, comic: dict):
-    query = comics.update().where(comics.c.id == comic_id).values(
+    # Verificar si el cómic existe
+    query = comics.select().where(comics.c.id == comic_id)
+    existing_comic = await database.fetch_one(query)
+    
+    if existing_comic is None:
+        raise HTTPException(status_code=404, detail="Comic not found")
+    
+    # Actualizar el cómic
+    update_query = comics.update().where(comics.c.id == comic_id).values(
         title=comic["title"],
         description=comic["description"],
         author=comic["author"],
         price=comic["price"],
         stock=comic["stock"],
     )
-    result = await database.execute(query)
-    if not result:
-        raise HTTPException(status_code=404, detail="Comic not found")
+    await database.execute(update_query)
+    
     return {**comic, "id": comic_id}
 
 @app.delete("/comics/{comic_id}")
 async def delete_comic(comic_id: int):
-    query = comics.delete().where(comics.c.id == comic_id)
-    result = await database.execute(query)
-    if not result:
+    # Verificar si el cómic existe
+    query = comics.select().where(comics.c.id == comic_id)
+    existing_comic = await database.fetch_one(query)
+    
+    if existing_comic is None:
         raise HTTPException(status_code=404, detail="Comic not found")
+    
+    # Eliminar el cómic
+    delete_query = comics.delete().where(comics.c.id == comic_id)
+    await database.execute(delete_query)
+    
     return {"message": "Comic deleted successfully"}
+
